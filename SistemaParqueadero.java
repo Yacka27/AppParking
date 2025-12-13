@@ -6,22 +6,29 @@ import java.util.Map;
 import java.util.Scanner;
 
 /* ============================
-   CLASE VEHÍCULO
+   CLASE VEHICULO
 ============================ */
 class Vehiculo {
     String placa;
     String tipo;
     Date fechaEntrada;
     Date fechaSalida;
+    int celdaAsignada;
 
-    public Vehiculo(String placa, String tipo) {
+    public Vehiculo(String placa, String tipo, int celdaAsignada) {
         this.placa = placa;
         this.tipo = tipo;
+        this.celdaAsignada = celdaAsignada;
         this.fechaEntrada = new Date();
     }
 
     public void registrarSalida() {
         this.fechaSalida = new Date();
+    }
+
+    public long getTiempoEnMinutos() {
+        if (fechaSalida == null) return 0;
+        return (fechaSalida.getTime() - fechaEntrada.getTime()) / 60000;
     }
 }
 
@@ -50,37 +57,41 @@ class Celda {
     }
 
     public void ocupar() {
-        this.disponible = false;
+        disponible = false;
     }
 
     public void liberar() {
-        this.disponible = true;
+        disponible = true;
     }
 }
 
 /* ============================
-   CLASE PAGO
+   CLASE PAGO (ITERACIÓN 3)
 ============================ */
 class Pago {
     String idPago;
-    String idUsuario;
+    Usuario usuario;
+    Vehiculo vehiculo;
     double monto;
-    Date fecha;
+    Date fechaPago;
 
-    public Pago(String idPago, String idUsuario, double monto) {
+    public Pago(String idPago, Usuario usuario, Vehiculo vehiculo, double monto) {
         this.idPago = idPago;
-        this.idUsuario = idUsuario;
+        this.usuario = usuario;
+        this.vehiculo = vehiculo;
         this.monto = monto;
-        this.fecha = new Date();
+        this.fechaPago = new Date();
     }
 
     public void imprimirComprobante() {
         System.out.println("\n=== COMPROBANTE DE PAGO ===");
         System.out.println("ID Pago: " + idPago);
-        System.out.println("Usuario: " + idUsuario);
+        System.out.println("Usuario: " + usuario.nombre);
+        System.out.println("Placa vehículo: " + vehiculo.placa);
+        System.out.println("Celda: " + vehiculo.celdaAsignada);
         System.out.println("Monto: $" + monto);
-        System.out.println("Fecha: " + fecha.toString());
-        System.out.println("============================\n");
+        System.out.println("Fecha: " + fechaPago);
+        System.out.println("==========================\n");
     }
 }
 
@@ -95,6 +106,8 @@ public class SistemaParqueadero {
     static List<Pago> pagos = new ArrayList<>();
     static Scanner sc = new Scanner(System.in);
 
+    static final double TARIFA_POR_MINUTO = 100; // tarifa base
+
     public static void main(String[] args) {
         boolean salir = false;
 
@@ -106,15 +119,15 @@ public class SistemaParqueadero {
             System.out.println("4. Registrar celda");
             System.out.println("5. Consultar celdas disponibles");
             System.out.println("6. Registrar pago");
-            System.out.println("7. Consultar historial de pagos");
+            System.out.println("7. Consultar pagos por usuario");
             System.out.println("8. Salir");
             System.out.print("Seleccione una opción: ");
 
             int opcion;
             try {
-                opcion = Integer.parseInt(sc.nextLine().trim());
+                opcion = Integer.parseInt(sc.nextLine());
             } catch (Exception e) {
-                System.out.println("Entrada inválida. Intente nuevamente.");
+                System.out.println("Opción inválida.");
                 continue;
             }
 
@@ -126,10 +139,7 @@ public class SistemaParqueadero {
                 case 5 -> consultarCeldas();
                 case 6 -> registrarPago();
                 case 7 -> consultarPagos();
-                case 8 -> {
-                    System.out.println("Saliendo del sistema...");
-                    salir = true;
-                }
+                case 8 -> salir = true;
                 default -> System.out.println("Opción no válida.");
             }
         }
@@ -137,65 +147,65 @@ public class SistemaParqueadero {
     }
 
     /* ============================
-       MÉTODOS DEL SISTEMA
+       MÉTODOS ITERACIÓN 1 Y 2
     ============================ */
 
     static void registrarEntrada() {
+        Celda celdaLibre = celdas.stream()
+                .filter(c -> c.disponible)
+                .findFirst()
+                .orElse(null);
+
+        if (celdaLibre == null) {
+            System.out.println("No hay celdas disponibles.");
+            return;
+        }
+
         System.out.print("Placa: ");
-        String placa = sc.nextLine().trim();
-
+        String placa = sc.nextLine();
         System.out.print("Tipo (carro/moto): ");
-        String tipo = sc.nextLine().trim();
+        String tipo = sc.nextLine();
 
-        Vehiculo v = new Vehiculo(placa, tipo);
+        celdaLibre.ocupar();
+        Vehiculo v = new Vehiculo(placa, tipo, celdaLibre.numero);
         vehiculos.put(placa, v);
 
-        System.out.println("Entrada registrada correctamente.");
+        System.out.println("Vehículo ingresado en celda " + celdaLibre.numero);
     }
 
     static void registrarSalida() {
         System.out.print("Placa del vehículo: ");
-        String placa = sc.nextLine().trim();
-
+        String placa = sc.nextLine();
         Vehiculo v = vehiculos.get(placa);
 
-        if (v != null) {
-            v.registrarSalida();
-            System.out.println("Salida registrada correctamente.");
-        } else {
+        if (v == null) {
             System.out.println("Vehículo no encontrado.");
+            return;
         }
+
+        v.registrarSalida();
+        liberarCelda(v.celdaAsignada);
+        System.out.println("Salida registrada.");
     }
 
     static void registrarUsuario() {
         System.out.print("ID Usuario: ");
-        String id = sc.nextLine().trim();
-
+        String id = sc.nextLine();
         System.out.print("Nombre: ");
-        String nombre = sc.nextLine().trim();
-
+        String nombre = sc.nextLine();
         usuarios.put(id, new Usuario(id, nombre));
-
-        System.out.println("Usuario registrado exitosamente.");
+        System.out.println("Usuario registrado.");
     }
 
     static void registrarCelda() {
-        System.out.print("Número de la celda: ");
-        int numero;
-
-        try {
-            numero = Integer.parseInt(sc.nextLine().trim());
-        } catch (Exception e) {
-            System.out.println("Número inválido.");
-            return;
-        }
-
-        celdas.add(new Celda(numero));
-        System.out.println("Celda registrada correctamente.");
+        System.out.print("Número de celda: ");
+        int num = Integer.parseInt(sc.nextLine());
+        celdas.add(new Celda(num));
+        System.out.println("Celda registrada.");
     }
 
     static void consultarCeldas() {
-        System.out.println("\n--- CELDAS DISPONIBLES ---");
+        System.out.println("Celdas disponibles:");
         for (Celda c : celdas) {
             if (c.disponible) {
                 System.out.println("Celda #" + c.numero);
@@ -203,37 +213,56 @@ public class SistemaParqueadero {
         }
     }
 
+    /* ============================
+       ITERACIÓN 3 – GESTIÓN DE PAGOS
+    ============================ */
+
     static void registrarPago() {
-        System.out.print("ID del pago: ");
-        String idPago = sc.nextLine().trim();
+        System.out.print("ID Pago: ");
+        String idPago = sc.nextLine();
 
         System.out.print("ID Usuario: ");
-        String idUsuario = sc.nextLine().trim();
+        String idUsuario = sc.nextLine();
+        Usuario usuario = usuarios.get(idUsuario);
 
-        System.out.print("Monto: ");
-
-        double monto;
-        try {
-            monto = Double.parseDouble(sc.nextLine().trim());
-        } catch (Exception e) {
-            System.out.println("Monto inválido.");
+        if (usuario == null) {
+            System.out.println("Usuario no existe.");
             return;
         }
 
-        Pago p = new Pago(idPago, idUsuario, monto);
-        pagos.add(p);
+        System.out.print("Placa del vehículo: ");
+        String placa = sc.nextLine();
+        Vehiculo vehiculo = vehiculos.get(placa);
 
-        p.imprimirComprobante();
+        if (vehiculo == null || vehiculo.fechaSalida == null) {
+            System.out.println("El vehículo no ha registrado salida.");
+            return;
+        }
+
+        long minutos = vehiculo.getTiempoEnMinutos();
+        double monto = minutos * TARIFA_POR_MINUTO;
+
+        Pago pago = new Pago(idPago, usuario, vehiculo, monto);
+        pagos.add(pago);
+        pago.imprimirComprobante();
     }
 
     static void consultarPagos() {
         System.out.print("ID Usuario: ");
-        String id = sc.nextLine().trim();
+        String id = sc.nextLine();
 
-        System.out.println("\n--- PAGOS DEL USUARIO ---");
         for (Pago p : pagos) {
-            if (p.idUsuario.equals(id)) {
+            if (p.usuario.id.equals(id)) {
                 p.imprimirComprobante();
+            }
+        }
+    }
+
+    static void liberarCelda(int numeroCelda) {
+        for (Celda c : celdas) {
+            if (c.numero == numeroCelda) {
+                c.liberar();
+                break;
             }
         }
     }
